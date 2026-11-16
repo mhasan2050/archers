@@ -303,7 +303,7 @@ def list_documents(
     return DocumentPage(
         items=[document_dto(document) for document in documents],
         next_cursor=make_cursor(settings, actor, "documents", documents[-1].id) if more else None,
-        warnings=["Ingestion worker and index publication are not connected in this increment."],
+        warnings=["RAG query generation is not connected; automatic source withdrawal is disabled."],
     )
 
 

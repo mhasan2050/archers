@@ -3,6 +3,53 @@
 Status: required protocol with provisional operational timings. See
 [schema](./data-model.md), [security](./security.md), and [API](./api-contracts.yaml).
 
+## Current implementation
+
+The `archers watch` process automatically polls enabled filesystem sources and
+creates immutable snapshots and durable jobs for stable new/changed files.
+`archers worker` runs isolated extraction, quality checks, tokenizer-bounded
+chunking, local dense/sparse encoding, Qdrant staging/verification and fenced
+PostgreSQL activation. Manual uploads use the same worker. Prepare local model
+assets explicitly; no model downloads happen inside either runtime process.
+
+Local source identity uses `.archers-source-id`. NAS aliases additionally require
+`network_mounts` and `mount_health_files` in operator configuration. The protected
+host record contains `mount_alias`, `sentinel_id`, `healthy` and timezone-aware
+`checked_at`; it expires after 60 seconds. Host probe deployment is operator work.
+Paths are opened relative to directory descriptors with no-follow checks.
+Private artifact/model subtrees, hidden/temp names and symlinks are excluded.
+Completed scan summaries are append-only; current scan status and file
+observations survive restarts. Scan limits and deferred file errors are visible
+via `GET /sources/{id}/status`.
+
+The initial watcher serializes a bounded scan per tenant using the existing
+tenant transaction lock. This favors correctness over scan/API concurrency;
+large deployments must measure lock latency and tune scan budgets. Hashing is
+limited per cycle; deferred candidates are picked up in following cycles.
+Accepted unchanged files are rehashed daily, not on every poll.
+
+Warnings or empty extraction enter `REVIEW_REQUIRED`; OCR and review-resolution
+workflows are not implemented. Automatic source withdrawal is frozen, even after
+healthy absences. Generation/orphan cleanup is not yet automated. A failed
+replacement keeps the previous active generation. Full query orchestration and
+answer generation remain separate unfinished work; global RAG readiness stays 503.
+
+The sections below describe the full target protocol. Timings and chunk sizes
+are design ceilings; the selected model's actual tokenizer/sequence limit wins.
+
+The implemented local profile uses all-MiniLM-L6-v2 at pinned revision
+`1110a243fdf4706b3f48f1d95db1a4f5529b4d41` (model card: Apache-2.0).
+Explicit setup downloads only reviewed checksum-verified assets. Runtime
+embedding uses ONNX CPU mean pooling and normalization, producing 384 dimensions.
+Chunks split each normalized block at original tokenizer character offsets,
+retaining contributing format locations. The 256-token model limit includes
+two special tokens, allowing at most 254 content tokens with up to 60 overlap.
+Cross-block heading reconstruction and repeated table headers are not yet
+implemented. Sparse encoding uses deterministic hashed log-term-frequency
+weights, not corpus-trained BM25. Any profile/pipeline change requires a distinct
+fingerprinted collection and controlled reindex; incompatible active profiles
+cannot be mixed by publication.
+
 Source adapters, format allowlists and normalized citations are defined in
 [connectors/formats](./connectors-formats.md). The filesystem protocol below
 specializes common health/snapshot/publication rules; remote sources use their

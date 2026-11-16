@@ -11,13 +11,31 @@ certification. CI and complete RAG runtime validation remain pending.
 - `cd web && npm test && npm run build`
 - With isolated `ARCHERS_TEST_DATABASE_URL` (database name ends `_validation`):
   `backend/.venv/bin/python -m pytest backend/tests/test_postgres_ingestion.py -q`.
-  Covers populated 0001-to-0002 upgrade, concurrent duplicate uploads, SKIP
-  LOCKED replicas, durable restart and stale lease fencing. Tests remove only
+  Covers populated 0001-to-0003 upgrade, concurrent duplicate uploads/scanners,
+  SKIP LOCKED replicas, durable restart and stale lease fencing. Tests remove only
   their generated schemas.
 
-Stage-two acceptance is not parser sandbox/publication/query certification.
-Model weights have not been downloaded. Docker daemon remains unavailable for
-image/build/runtime checks; Compose syntax can be checked without it.
+For actual model/vector integration, also set `ARCHERS_TEST_MODEL_PATH` to an
+explicitly prepared local embedding directory and `ARCHERS_TEST_QDRANT_URL` to
+an isolated local Qdrant server. `test_indexing.py` checks real semantic similarity
+without runtime downloads; `test_postgres_ingestion.py` covers folder discovery,
+actual local embeddings, vector retrieval/tenant separation, replacement
+activation/retirement and PDF page provenance. Neither test sends document text
+to an external service. Without those explicit resources the optional tests skip.
+
+The automatic ingestion suite also covers stability/restart deduplication,
+completion manifests, oversized-file isolation, source health, cancellation,
+failed-replacement preservation, integrity checks and review-required extraction.
+macOS parser tests verify that network connection attempts, unrelated file reads
+and original-file writes are denied. Linux Landlock/seccomp behavior still needs
+container runtime validation; unsupported sandboxes fail closed.
+
+A live API/watcher/worker run was verified with PostgreSQL 14, Qdrant 1.15.5 and
+the pinned CPU model: saving a synthetic file activated it automatically after
+the real stability interval, without a manual upload request. This is ingestion
+verification, not complete RAG/query or production certification.
+Docker daemon remains unavailable for image/build/runtime checks; Compose syntax
+can be checked without it.
 
 ## Tooling and change workflow
 

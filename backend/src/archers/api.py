@@ -28,6 +28,7 @@ from archers.dto import (
     SessionInfo,
     SourceDTO,
     SourcePage,
+    SourceStatus,
     UpdateSource,
     UpdateUser,
     UserDTO,
@@ -317,6 +318,16 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
             actor, _ = current(request, db, "sources.manage", mutation=True)
             return services.update_source(db, settings, actor, id, body, check_revision(if_match))
 
+    @app.get(
+        PREFIX + "/sources/{id}/status", response_model=SourceStatus, operation_id="getSourceStatus"
+    )
+    def observe_source(id: UUID, request: Request) -> SourceStatus:
+        from archers.watcher import source_status
+
+        with Session(database) as db:
+            actor, _ = current(request, db, "sources.observe")
+            return source_status(db, actor.tenant_id, id)
+
     @app.get(PREFIX + "/health/live", response_model=Health, operation_id="liveness")
     def live() -> Health:
         return Health()
@@ -326,7 +337,7 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
         operator(request, settings)
         check_schema(database)
         raise DomainError(
-            "MODEL_UNAVAILABLE", "RAG inference is not implemented in the foundation stage.", 503
+            "MODEL_UNAVAILABLE", "RAG query generation is not connected yet.", 503
         )
 
     @app.get(PREFIX + "/metrics", response_class=PlainTextResponse, operation_id="metrics")

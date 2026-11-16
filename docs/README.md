@@ -9,9 +9,12 @@ Implementation status (current workspace):
 - Stage-two ingestion acceptance adds manual uploads/replacements, immutable
   snapshots, durable PostgreSQL jobs and fenced lease/cancel/retry primitives.
   See [runtime instructions](../README.md).
-- Worker execution, automatic watcher scans, publication, query orchestration,
-  vector retrieval and paid-provider gateway workflows are
-  intentionally not implemented yet and must not be treated as operational.
+- Automatic filesystem polling, persistent stability observations, isolated
+  parsing, local model-aware chunks/embeddings and verified Qdrant publication
+  are implemented with migration 0003. Manual uploads use the same worker.
+  NAS requires independent host-health evidence.
+- Query orchestration/answers, OCR/review resolution, automatic withdrawals,
+  vector/orphan cleanup and paid-provider gateway workflows remain unfinished.
 
 ## Purpose and authority
 

@@ -1,6 +1,11 @@
 # Architecture and framework contract
 
-Status: adopted design baseline, not implemented. See [context authority](./README.md).
+Status: target architecture with staged implementation. Filesystem watcher,
+isolated parser worker, local chunk/embedding adapters and verified Qdrant
+publication now exist alongside authentication/admin/upload APIs. Query
+orchestration, generation, OCR, cloud connectors, paid providers and automated
+cleanup remain unfinished. See [current runtime](../README.md) and
+[context authority](./README.md).
 
 ## Boundaries
 

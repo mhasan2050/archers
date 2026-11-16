@@ -2,6 +2,7 @@ import argparse
 import getpass
 import logging
 import os
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -74,10 +75,24 @@ def main() -> None:
     bootstrap_parser.add_argument("--company", required=True)
     sub.add_parser("api", help="Serve the administration API on internal port 8000.")
     sub.add_parser("check-config", help="Validate without printing secrets.")
+    for name in ("watch", "worker"):
+        service = sub.add_parser(name, help=f"Run the automatic ingestion {name} process.")
+        service.add_argument("--once", action="store_true", help="Run one polling/claim cycle.")
+    initialize = sub.add_parser("source-init", help="Initialize a local source identity sentinel.")
+    initialize.add_argument("--mount-alias", required=True)
+    model = sub.add_parser("download-model", help="Explicitly prepare reviewed local embedding assets.")
+    model.add_argument("--directory", type=Path, required=True)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
-        load_settings()
+        if args.command == "download-model":
+            from archers.indexing import download_model
+
+            download_model(args.directory)
+            print("Pinned embedding model prepared; runtime downloads remain disabled.")
+            return
+        settings = load_settings()
         if args.command == "migrate":
             command.upgrade(migration_config(), "head")
             print("Migrations applied.")
@@ -99,14 +114,73 @@ def main() -> None:
                 access_log=False,
                 proxy_headers=False,
             )
+        elif args.command == "source-init":
+            from archers.watcher import SENTINEL
+
+            if (
+                args.mount_alias not in settings.approved_mounts
+                or args.mount_alias in settings.network_mounts
+            ):
+                raise DomainError(
+                    "VALIDATION_ERROR", "Initialize only an approved local folder.", 422
+                )
+            root = Path(settings.approved_mounts[args.mount_alias])
+            if not root.is_dir() or root.is_symlink():
+                raise DomainError("VALIDATION_ERROR", "Create the source directory first.", 422)
+            sentinel = root / SENTINEL
+            if sentinel.exists():
+                from uuid import UUID
+
+                identity = UUID(sentinel.read_text().strip())
+            else:
+                identity = uuid4()
+                with sentinel.open("x") as file:
+                    file.write(str(identity) + "\n")
+                    file.flush()
+                    os.fsync(file.fileno())
+            print(f"Source sentinel ID: {identity}")
+        elif args.command in {"watch", "worker"}:
+            engine = make_engine(settings.database_url.get_secret_value())
+            try:
+                check_schema(engine)
+                if args.command == "watch":
+                    from archers.watcher import watch_once
+
+                    while True:
+                        watch_once(engine, settings)
+                        if args.once:
+                            break
+                        time.sleep(1)
+                else:
+                    from archers.indexing import LocalEncoder, VectorIndex
+                    from archers.worker import work_once
+
+                    encoder = LocalEncoder(settings.model_path)
+                    index = VectorIndex(
+                        settings.qdrant_url, "archers_" + encoder.fingerprint[:32], encoder.dimension
+                    )
+                    try:
+                        owner = uuid4().hex
+                        while True:
+                            processed = work_once(engine, settings, encoder, index, owner)
+                            if args.once:
+                                break
+                            if not processed:
+                                time.sleep(1)
+                    finally:
+                        index.close()
+            finally:
+                engine.dispose()
         else:
             print("Configuration valid; no external model/source egress enabled.")
     except DomainError as exc:
         parser.exit(1, f"{exc.code}: {exc.message}\n")
     except ValidationError:
         parser.exit(1, "Configuration does not meet the deployment contract.\n")
-    except (SQLAlchemyError, OSError, RuntimeError):
+    except (SQLAlchemyError, OSError, RuntimeError, ValueError):
         parser.exit(1, "Operation failed; check configuration, database and migration state.\n")
+    except KeyboardInterrupt:
+        print("Stopped.")
 
 
 if __name__ == "__main__":

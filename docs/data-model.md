@@ -6,9 +6,13 @@ omit private storage fields.
 
 Implementation coverage: migrations 0001 and 0002 implement identity, source
 configuration, audit/idempotency/throttles and manual documents/versions/jobs.
-Active version foreign keys are tenant/document scoped. Source inventory,
-index generations/chunks, conversation state and billing tables remain designs.
-See [runtime scope](../README.md); no active generation is created by acceptance.
+Migration 0003 adds durable source-file observations, append-only scan summaries,
+current `source_scan_status`, index generations and chunk metadata. Active version
+and generation foreign keys are tenant/document/version scoped. Source version
+linkage and scan revision are also pinned in ingestion job payloads. The worker
+creates active generations only after vector verification and current lifecycle
+checks; upload acceptance alone never activates a document. Conversation state,
+remote cursors and billing tables remain designs. See [runtime scope](../README.md).
 
 ## Global rules
 
@@ -41,7 +45,8 @@ through role names: they require a separate approved access-policy change.
 | Entity | Required logical fields | Constraints/ownership |
 |---|---|---|
 | `sources` | ID, tenant, connector_kind, typed config JSON, enabled, revision, format allowlist, scan policy, export flags, health_state, last_healthy_scan_at, lease owner/expiry/fencing token | Connector config discriminated/validated; approved scopes/endpoints and secret refs only; no raw secrets |
-| `source_scans` | ID, tenant, source, started_at, completed_at nullable, complete, healthy, error_code nullable, observed_count, deletion_alert_revision nullable | Completed scans immutable; failed/incomplete scans cannot prove absence |
+| `source_scans` | ID, tenant, source, started_at, completed_at, complete, healthy, error_code nullable, observed_count | Completed summaries immutable; failed/incomplete scans cannot prove absence; deletion alerts remain planned |
+| `source_scan_status` | Tenant/source, observed_at, last_healthy_at, next_scan_at, error_code, observed_count | Mutable polling schedule/current health; not a substitute for append-only summaries |
 | `source_files` | ID, tenant, source, item_key, display_path, remote_revision nullable, document_id nullable until snapshot accepted, desired_revision, observed_size/mtime/hash, stable_since nullable, last_seen_scan_id, missing_since/count, state, suppressed | Unique `(tenant, source, item_key)`; filesystem key is canonical path, remote key is stable provider ID/object key |
 | `source_observations` | ID, tenant, scan, source_file or newly observed path, size/mtime/hash nullable, observation_state, error_code nullable | Includes unreadable paths; one finalized path observation/scan |
 | `source_cursors` | Tenant/source, cursor kind/value, scope revision, last committed scan/watermark | Advance with durable observation/job transaction; expired cursors resync safely |
@@ -165,9 +170,13 @@ active generations, source missing counters, owner/conversation history, event
 replay, and session expiry. Index selection is verified with representative data.
 
 Qdrant collections are fingerprinted by embedding and pipeline. Point UUIDs derive
-from tenant/version/generation/ordinal. Named vectors: `dense` (initial candidate
-768 cosine dimensions) and `sparse` (pinned local BM25 encoder/IDF configuration).
-Payload IDs: tenant, document, version, generation, ordinal, section metadata.
+from tenant/version/generation/ordinal. The current profile stores named vectors:
+`dense` (384-dimensional cosine, checksum-pinned all-MiniLM-L6-v2 ONNX with mean
+pooling/L2 normalization) and `sparse` (stable SHA-256 term hashing with log-TF
+weights). The current sparse adapter is not BM25; a corpus-aware BM25 profile
+requires its own fingerprint and reindex. The earlier 768-dimensional candidate
+is not an executable default. Payload IDs: tenant, document, version, generation,
+ordinal. Text and source locations stay in private artifacts/PostgreSQL.
 Index tenant/document/generation payloads; do not return raw text from Qdrant.
 Never query a collection with an incompatible encoder/tokenizer.
 

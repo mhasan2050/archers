@@ -113,7 +113,7 @@ export function App() {
         </section> :
         <>
           <h1>{usersAllowed || sourcesAllowed ? 'Administration' : 'Welcome'}</h1>
-          <p>Query and ingestion interfaces are not yet implemented. The API accepts manual uploads into a durable queue; automatic scanning, worker processing and RAG publication are not connected yet.</p>
+          <p>Query and ingestion interfaces are not yet implemented. Configured folders can be scanned and indexed automatically when the watcher, worker, local embedding model and Qdrant are running. Manual uploads are available through the API. Answer generation is not connected yet.</p>
           <p className="muted">The server enforces access. UI visibility does not grant permissions.</p>
           {session.user.disabled && <p role="alert" className="error">This account is disabled. Sign out and contact your administrator.</p>}
           {(usersAllowed || sourcesAllowed) && <>

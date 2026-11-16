@@ -161,7 +161,7 @@ paths:
       x-permissions: [sources.observe]
       responses:
         '200':
-          description: Scan health, backlog and deletion circuit, without credentials.
+          description: Scan health, deferred snapshot backlog and file errors, without credentials. Automatic withdrawal currently remains frozen.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SourceStatus'}
@@ -815,6 +815,8 @@ components:
         missing_files: {type: integer, minimum: 0}
         deletion_frozen: {type: boolean}
         deletion_alert_revision: {type: [integer, 'null'], minimum: 1}
+        error_code: {type: [string, 'null'], description: Sanitized scanner error or warning code.}
+        file_errors: {type: integer, minimum: 0, description: Files with deferred acceptance errors.}
     DeletionReview:
       type: object
       additionalProperties: false

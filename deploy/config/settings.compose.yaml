@@ -6,4 +6,6 @@ artifact_root: /data
 max_upload_bytes: 26214400
 job_lease_seconds: 120
 approved_mounts:
-  synthetic: /synthetic
+  inbox: /sources/inbox
+model_path: /models/embedding
+qdrant_url: http://qdrant:6333

@@ -4,6 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libseccomp2 && \
+    apt-get clean
 COPY pyproject.toml /app/pyproject.toml
 COPY src /app/src
 RUN python -m pip install --upgrade pip && \

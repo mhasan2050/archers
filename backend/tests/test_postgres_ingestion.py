@@ -190,3 +190,123 @@ def test_postgres_concurrent_upload_same_key_creates_one_job(postgres_client: Te
         assert db.scalar(select(func.count(Job.id))) == 1
     artifacts = list(client.app.state.settings.artifact_root.rglob("original.txt"))
     assert len(artifacts) == 1
+
+
+def test_postgres_concurrent_scanners_create_one_version(
+    postgres_client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from archers import watcher
+    from archers.storage import DocumentVersion, SourceScanEvent
+
+    client = postgres_client
+    engine, settings = client.app.state.database, client.app.state.settings
+    root = Path(settings.approved_mounts["synthetic"])
+    with Session(engine) as db:
+        source = db.scalar(select(Source))
+        assert source is not None
+        sentinel_id = source.config["sentinel_id"]
+    (root / watcher.SENTINEL).write_text(sentinel_id)
+    (root / "synthetic.txt").write_text("Synthetic leave entitlement is twenty days.")
+    start = now_utc() - timedelta(seconds=60)
+    for offset in (0, 30, 60):
+        monkeypatch.setattr(
+            watcher, "database_now", lambda db, offset=offset: start + timedelta(seconds=offset)
+        )
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = [
+                executor.submit(watcher.watch_once, engine, settings)
+                for _ in range(2)
+            ]
+            assert sum(future.result(timeout=10) for future in results) == 1
+    with Session(engine) as db:
+        assert db.scalar(select(func.count(Job.id))) == 1
+        assert db.scalar(select(func.count(DocumentVersion.id))) == 1
+        assert db.scalar(select(func.count(SourceScanEvent.id))) == 3
+
+
+def test_postgres_real_model_folder_to_qdrant(
+    postgres_client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_path = os.environ.get("ARCHERS_TEST_MODEL_PATH")
+    vector_url = os.environ.get("ARCHERS_TEST_QDRANT_URL")
+    if not model_path or not vector_url:
+        pytest.skip("Set explicit local model and Qdrant URL for real indexing validation.")
+    from archers import watcher
+    from archers.indexing import LocalEncoder, VectorIndex
+    from archers.storage import ChunkRecord, Document, IndexGeneration
+    from archers.worker import work_once
+
+    client = postgres_client
+    engine = client.app.state.database
+    settings = client.app.state.settings.model_copy(update={
+        "model_path": Path(model_path), "qdrant_url": vector_url,
+    })
+    root = Path(settings.approved_mounts["synthetic"])
+    with Session(engine) as db, db.begin():
+        source = db.scalar(select(Source))
+        assert source is not None
+        source.formats = ["text", "pdf"]
+        tenant_id = source.tenant_id
+        (root / watcher.SENTINEL).write_text(source.config["sentinel_id"])
+    text = "Synthetic policy: employees receive twenty days of paid annual vacation."
+    (root / "vacation.txt").write_text(text)
+    start = now_utc() - timedelta(seconds=60)
+    for offset in (0, 30, 60):
+        monkeypatch.setattr(
+            watcher, "database_now", lambda db, offset=offset: start + timedelta(seconds=offset)
+        )
+        watcher.watch_once(engine, settings)
+    encoder = LocalEncoder(settings.model_path)
+    index = VectorIndex(vector_url, "validation_" + uuid4().hex, encoder.dimension)
+    try:
+        assert work_once(engine, settings, encoder, index, "real-encoder-validation")
+        with Session(engine) as db:
+            job = db.scalar(select(Job))
+            assert job is not None and job.status == "SUCCEEDED", job.error_code if job else None
+            document = db.scalar(select(Document))
+            assert document is not None and document.availability == "ACTIVE"
+            generation = db.get(IndexGeneration, document.active_generation_id)
+            assert generation is not None and generation.state == "ACTIVE"
+            assert generation.chunk_count > 0
+            document_id, first_version, first_generation = document.id, document.active_version_id, generation.id
+        vector = encoder.encode(["What is the annual vacation allowance?"])[0]
+        hits = index.search(tenant_id, vector)
+        assert hits and hits[0]["payload"]["document_id"] == str(document_id)
+        assert "text" not in hits[0]["payload"]
+        assert index.search(uuid4(), vector) == []
+        (root / "vacation.txt").write_text(
+            "Synthetic revised policy: employees receive thirty days of paid annual vacation."
+        )
+        for offset in (90, 120, 150):
+            monkeypatch.setattr(
+                watcher, "database_now", lambda db, offset=offset: start + timedelta(seconds=offset)
+            )
+            watcher.watch_once(engine, settings)
+        assert work_once(engine, settings, encoder, index, "replacement-validation")
+        with Session(engine) as db:
+            document = db.get(Document, document_id)
+            assert document is not None and document.availability == "ACTIVE"
+            assert document.active_version_id != first_version
+            assert document.active_generation_id != first_generation
+            assert db.get(IndexGeneration, first_generation).state == "RETIRED"
+            assert db.get(IndexGeneration, document.active_generation_id).state == "ACTIVE"
+        # Qdrant still contains retired data until cleanup; canonical DB pointers select eligibility.
+        payloads = [hit["payload"] for hit in index.search(tenant_id, vector)]
+        assert {p["generation_id"] for p in payloads} >= {str(first_generation), str(document.active_generation_id)}
+        from test_normalization import _pdf_bytes
+
+        (root / "page.pdf").write_bytes(_pdf_bytes())
+        for offset in (180, 210, 240):
+            monkeypatch.setattr(
+                watcher, "database_now", lambda db, offset=offset: start + timedelta(seconds=offset)
+            )
+            watcher.watch_once(engine, settings)
+        assert work_once(engine, settings, encoder, index, "pdf-validation")
+        with Session(engine) as db:
+            pdf = db.scalar(select(Document).where(Document.format == "pdf"))
+            assert pdf is not None and pdf.availability == "ACTIVE"
+            chunk = db.scalar(select(ChunkRecord).where(ChunkRecord.document_id == pdf.id))
+            assert chunk is not None and chunk.locations[0]["kind"] == "pdf_page"
+            assert chunk.locations[0]["page"] == 1
+    finally:
+        index.close()

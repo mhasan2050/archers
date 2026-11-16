@@ -22,7 +22,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from archers.domain import Role
 
-SCHEMA_REVISION = "0002_ingestion_jobs"
+SCHEMA_REVISION = "0003_automatic_ingestion"
 
 
 def now_utc() -> datetime:
@@ -185,6 +185,17 @@ class Document(Base):
             deferrable=True,
             initially="DEFERRED",
         ),
+        ForeignKeyConstraint(
+            ["tenant_id", "id", "active_version_id", "active_generation_id"],
+            [
+                "index_generations.tenant_id", "index_generations.document_id",
+                "index_generations.version_id", "index_generations.id",
+            ],
+            name="fk_documents_active_generation",
+            use_alter=True,
+            deferrable=True,
+            initially="DEFERRED",
+        ),
         CheckConstraint("revision > 0 AND acl_revision > 0 AND desired_sequence > 0"),
         CheckConstraint("origin IN ('manual', 'nas', 'connector')"),
         CheckConstraint(
@@ -254,6 +265,113 @@ class Job(Base):
         CheckConstraint(
             "status IN ('PENDING','RUNNING','RETRY_WAIT','SUCCEEDED','FAILED','CANCELLED')"
         ),
+    )
+
+
+class SourceScan(Base):
+    __tablename__ = "source_scan_status"
+    source_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id"))
+    observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_healthy_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_scan_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    observed_count: Mapped[int] = mapped_column(Integer, default=0)
+    __table_args__ = (
+        ForeignKeyConstraint(["tenant_id", "source_id"], ["sources.tenant_id", "sources.id"]),
+    )
+
+
+class SourceScanEvent(Base):
+    __tablename__ = "source_scans"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id"))
+    source_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    healthy: Mapped[bool] = mapped_column(Boolean)
+    complete: Mapped[bool] = mapped_column(Boolean)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    observed_count: Mapped[int] = mapped_column(Integer)
+    __table_args__ = (
+        ForeignKeyConstraint(["tenant_id", "source_id"], ["sources.tenant_id", "sources.id"]),
+    )
+
+
+@event.listens_for(SourceScanEvent, "before_update")
+@event.listens_for(SourceScanEvent, "before_delete")
+def scan_immutable(*args: object) -> None:
+    raise ValueError("Completed source scans are append-only.")
+
+
+class SourceFile(Base):
+    __tablename__ = "source_files"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id"))
+    source_id: Mapped[UUID] = mapped_column(Uuid)
+    item_key: Mapped[str] = mapped_column(Text)
+    source_revision: Mapped[int] = mapped_column(Integer)
+    signature: Mapped[str] = mapped_column(String(200))
+    observed_hash: Mapped[str] = mapped_column(String(64))
+    stable_since: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    observations: Mapped[int] = mapped_column(Integer, default=1)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_hashed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accepted_hash: Mapped[str | None] = mapped_column(String(64))
+    document_id: Mapped[UUID | None] = mapped_column(Uuid)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "source_id", "item_key"),
+        ForeignKeyConstraint(["tenant_id", "source_id"], ["sources.tenant_id", "sources.id"]),
+        ForeignKeyConstraint(["tenant_id", "document_id"], ["documents.tenant_id", "documents.id"]),
+        CheckConstraint("observations > 0 AND source_revision > 0"),
+    )
+
+
+class IndexGeneration(Base):
+    __tablename__ = "index_generations"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id"))
+    document_id: Mapped[UUID] = mapped_column(Uuid)
+    version_id: Mapped[UUID] = mapped_column(Uuid)
+    collection: Mapped[str] = mapped_column(String(128))
+    fingerprint: Mapped[str] = mapped_column(String(128))
+    chunk_count: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(16), default="STAGING")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "document_id", "version_id", "id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "document_id", "version_id"],
+            ["document_versions.tenant_id", "document_versions.document_id", "document_versions.id"],
+        ),
+        CheckConstraint("chunk_count > 0"),
+        CheckConstraint("state IN ('STAGING','ACTIVE','RETIRED','FAILED')"),
+    )
+
+
+class ChunkRecord(Base):
+    __tablename__ = "chunks"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id"))
+    document_id: Mapped[UUID] = mapped_column(Uuid)
+    version_id: Mapped[UUID] = mapped_column(Uuid)
+    generation_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    ordinal: Mapped[int] = mapped_column(Integer)
+    text_locator: Mapped[str] = mapped_column(Text)
+    text_hash: Mapped[str] = mapped_column(String(64))
+    token_count: Mapped[int] = mapped_column(Integer)
+    locations: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    __table_args__ = (
+        UniqueConstraint("generation_id", "ordinal"),
+        ForeignKeyConstraint(
+            ["tenant_id", "document_id", "version_id", "generation_id"],
+            [
+                "index_generations.tenant_id", "index_generations.document_id",
+                "index_generations.version_id", "index_generations.id",
+            ],
+        ),
+        CheckConstraint("ordinal >= 0 AND token_count > 0"),
     )
 
 

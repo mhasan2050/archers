@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, errorText } from './api';
 import { canManage, formats, roles } from './contracts';
-import type { CreateSource, Format, Page, Role, Session, Source, UpdateSource, UpdateUser, User } from './contracts';
+import type { CreateSource, Format, Page, Role, Session, Source, SourceStatus, UpdateSource, UpdateUser, User } from './contracts';
 
 interface PanelProps {
   session: Session;
@@ -136,6 +136,33 @@ export const defaultSource: CreateSource = {
   scan_policy: { poll_seconds: 30, stable_seconds: 60, deletion_grace_seconds: 300, completion_mode: 'atomic_rename' },
 };
 
+function SourceHealth({ source, onAuthFailure }: { source: Source; onAuthFailure: PanelProps['onAuthFailure'] }) {
+  const [status, setStatus] = useState<SourceStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function refresh() {
+    setBusy(true);
+    setError('');
+    setStatus(null);
+    try { setStatus(await api.sourceStatus(source.id)); }
+    catch (failure) {
+      setError(errorText(failure));
+      onAuthFailure(failure);
+    } finally { setBusy(false); }
+  }
+  return <div>
+    <button type="button" disabled={busy} onClick={() => void refresh()}>Check ingestion status</button>
+    {busy && <p role="status">Checking ingestion…</p>}
+    {error && <p role="alert" className="error">{error}</p>}
+    {status && <div role="status">
+      <p>Source health: {status.health}. Tracked files: {status.tracked_files}. Awaiting snapshot: {status.snapshot_backlog}. File errors: {status.file_errors}.</p>
+      {status.error_code && <p>Scanner code: {status.error_code}</p>}
+      <p>Last healthy scan: {status.last_healthy_scan_at ? new Date(status.last_healthy_scan_at).toLocaleString() : 'Not yet scanned'}.</p>
+      {status.deletion_frozen && <p>Automatic removal is disabled; missing files are retained.</p>}
+    </div>}
+  </div>;
+}
+
 export function sourcePolicy(data: FormData): UpdateSource {
   return {
     enabled: data.has('enabled'),
@@ -206,6 +233,7 @@ export function SourcesPanel({ session, onAuthFailure }: PanelProps) {
   return <section aria-labelledby="sources-heading">
     <h2 id="sources-heading">Sources</h2>
     <p>Import only a company-approved tenant-wide corpus. Remote ACLs are not mirrored. Credentials and mounts are provisioned by operators, not this UI.</p>
+    <p>Enabled folders are picked up automatically when the watcher and worker are running. New or changed files must remain stable for at least 60 seconds before processing.</p>
     <PanelStatus {...state} />
     <Pagination cursor={state.page.next_cursor} busy={state.busy} refresh={async cursor => { setEditing(null); setFormError(''); await state.refresh(cursor); }} />
     <div className="grid">
@@ -216,6 +244,7 @@ export function SourcesPanel({ session, onAuthFailure }: PanelProps) {
             <span>{source.connector.kind} · {source.enabled ? 'Enabled' : 'Paused'} · revision {source.revision}</span>
             <span>Formats: {source.formats.join(', ')}</span>
             <span>External generation: {source.export_policy.allow_external_generation ? 'allowed' : 'denied'} · embeddings: {source.export_policy.allow_external_embeddings ? 'allowed' : 'denied'}</span>
+            <SourceHealth key={`${source.id}-${source.revision}`} source={source} onAuthFailure={onAuthFailure} />
           </div><button disabled={state.busy} aria-label={`Edit source ${sourceLabel(source)}`} onClick={() => { setEditing(source); setFormError(''); }}>Edit</button>
         </li>)}</ul>
       </div>

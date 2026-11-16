@@ -18,6 +18,13 @@ class Settings(BaseModel):
     secure_cookie: bool = False
     session_hours: int = Field(default=8, ge=1, le=24)
     approved_mounts: dict[str, str] = Field(default_factory=dict)
+    network_mounts: list[str] = Field(default_factory=list)
+    mount_health_files: dict[str, str] = Field(default_factory=dict)
+    model_path: Path = Path("/models/embedding")
+    qdrant_url: str = "http://qdrant:6333"
+    scan_max_entries: int = Field(default=10000, ge=1, le=100000)
+    scan_max_bytes: int = Field(default=256 * 1024 * 1024, ge=1024, le=1024 * 1024 * 1024)
+    parser_timeout_seconds: int = Field(default=90, ge=1, le=300)
     max_json_bytes: int = Field(default=65536, ge=1024, le=1048576)
     artifact_root: Path = Path("/data")
     max_upload_bytes: int = Field(default=25 * 1024 * 1024, ge=1, le=100 * 1024 * 1024)
@@ -61,6 +68,21 @@ class Settings(BaseModel):
                 raise ValueError("Mount aliases must be alphanumeric identifiers.")
             if not Path(mount).is_absolute():
                 raise ValueError("Approved mounts must be absolute operator paths.")
+        if not self.model_path.is_absolute():
+            raise ValueError("Model path must be absolute.")
+        qdrant = urlsplit(self.qdrant_url)
+        if (
+            qdrant.scheme not in {"http", "https"} or not qdrant.hostname
+            or qdrant.username or qdrant.password or qdrant.query or qdrant.fragment
+            or qdrant.path not in {"", "/"}
+        ):
+            raise ValueError("Qdrant requires an operator-provisioned HTTP(S) origin.")
+        if not set(self.network_mounts).issubset(self.approved_mounts):
+            raise ValueError("Network mounts must reference approved aliases.")
+        if not set(self.network_mounts).issubset(self.mount_health_files):
+            raise ValueError("Each network mount requires a host health record.")
+        if any(not Path(p).is_absolute() for p in self.mount_health_files.values()):
+            raise ValueError("Mount health files must be absolute operator paths.")
         return self
 
     @property

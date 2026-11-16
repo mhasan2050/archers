@@ -1,8 +1,10 @@
 # Architecture Diagram
 
-Current implementation: stage-one administration and stage-two manual ingestion
-acceptance. The editable [draw.io diagram](../../../../../Architecture.drawio)
-adds a third page for the planned full RAG architecture; it is not operational yet.
+Historical view of stage-one administration and stage-two manual ingestion
+acceptance. Automatic filesystem ingestion and local vector indexing were added
+after this snapshot; see the [current runtime](../../../../../README.md).
+The editable [draw.io diagram](../../../../../Architecture.drawio) adds a third
+page for the full target RAG architecture; query generation is not operational yet.
 
 ## Application Architecture
 

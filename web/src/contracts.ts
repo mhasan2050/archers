@@ -56,6 +56,18 @@ export interface Source extends CreateSource {
   id: string;
   revision: number;
 }
+export interface SourceStatus {
+  source_id: string;
+  health: 'unknown' | 'healthy' | 'degraded' | 'unavailable' | 'paused';
+  last_healthy_scan_at: string | null;
+  snapshot_backlog: number;
+  tracked_files: number;
+  missing_files: number;
+  deletion_frozen: boolean;
+  deletion_alert_revision: number | null;
+  error_code: string | null;
+  file_errors: number;
+}
 export type UpdateSource = Partial<Omit<CreateSource, 'connector'>>;
 
 export function canManage(session: Session, permission: 'users.manage' | 'sources.manage') {

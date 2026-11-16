@@ -12,7 +12,7 @@ vi.mock('./api', async importOriginal => {
   return { ...original, api: {
     me: vi.fn(), login: vi.fn(), logout: vi.fn(),
     users: vi.fn(), createUser: vi.fn(), updateUser: vi.fn(),
-    sources: vi.fn(), createSource: vi.fn(), updateSource: vi.fn(),
+    sources: vi.fn(), sourceStatus: vi.fn(), createSource: vi.fn(), updateSource: vi.fn(),
   } };
 });
 const account: User = { id: '11111111-1111-4111-8111-111111111111', username: 'operator', role: 'admin', disabled: false, revision: 4 };
@@ -79,6 +79,23 @@ describe('authentication UX', () => {
 });
 
 describe('administration behavior', () => {
+  it('shows real source scan health and explicit status failures', async () => {
+    const visitor = userEvent.setup();
+    vi.mocked(api.sourceStatus).mockResolvedValueOnce({
+      source_id: source.id, health: 'degraded', last_healthy_scan_at: null,
+      snapshot_backlog: 2, tracked_files: 5, missing_files: 0,
+      deletion_frozen: true, deletion_alert_revision: null,
+      error_code: 'SOURCE_SCAN_STALE', file_errors: 1,
+    }).mockRejectedValueOnce(new ApiError(503, 'DEPENDENCY_UNAVAILABLE', 'Status unavailable.'));
+    render(<App />);
+    await visitor.click(await screen.findByRole('button', { name: 'Sources' }));
+    await visitor.click(await screen.findByRole('button', { name: 'Check ingestion status' }));
+    expect(await screen.findByText(/Source health: degraded/)).toHaveTextContent('Tracked files: 5');
+    expect(screen.getByText(/Scanner code: SOURCE_SCAN_STALE/)).toBeInTheDocument();
+    await visitor.click(screen.getByRole('button', { name: 'Check ingestion status' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Status unavailable');
+    expect(screen.queryByText(/Source health: degraded/)).not.toBeInTheDocument();
+  });
   it('creates a reader with validated password length and reloads metadata after editing', async () => {
     const visitor = userEvent.setup();
     vi.mocked(api.createUser).mockResolvedValueOnce({ ...account, username: 'new-reader', role: 'reader' });

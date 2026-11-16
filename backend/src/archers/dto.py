@@ -146,5 +146,18 @@ class SourcePage(StrictDTO):
     next_cursor: str | None
 
 
+class SourceStatus(StrictDTO):
+    source_id: UUID
+    health: Literal["unknown", "healthy", "degraded", "unavailable", "paused"]
+    last_healthy_scan_at: datetime | None
+    snapshot_backlog: int
+    tracked_files: int
+    missing_files: int
+    deletion_frozen: bool = True
+    deletion_alert_revision: int | None = None
+    error_code: str | None = None
+    file_errors: int = 0
+
+
 class Health(StrictDTO):
     status: Literal["ok"] = "ok"

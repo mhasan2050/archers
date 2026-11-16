@@ -1,4 +1,4 @@
-import type { CreateSource, CreateUser, Page, Session, Source, UpdateSource, UpdateUser, User } from './contracts';
+import type { CreateSource, CreateUser, Page, Session, Source, SourceStatus, UpdateSource, UpdateUser, User } from './contracts';
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {
@@ -71,6 +71,7 @@ export const api = {
   updateUser: (user: User, body: UpdateUser, csrf: string) =>
     request<User>(`/admin/users/${encodeURIComponent(user.id)}`, mutation('PATCH', csrf, body, user.revision)),
   sources: (cursor?: string) => request<Page<Source>>(`/admin/sources${cursorQuery(cursor)}`),
+  sourceStatus: (id: string) => request<SourceStatus>(`/sources/${encodeURIComponent(id)}/status`),
   createSource: (body: CreateSource, csrf: string) => request<Source>('/admin/sources', mutation('POST', csrf, body)),
   updateSource: (source: Source, body: UpdateSource, csrf: string) =>
     request<Source>(`/admin/sources/${encodeURIComponent(source.id)}`, mutation('PATCH', csrf, body, source.revision)),
