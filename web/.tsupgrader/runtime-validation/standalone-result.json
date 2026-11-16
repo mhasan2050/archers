@@ -1,0 +1,137 @@
+{
+  "planHash": "9b6013165840779c2c749cd7bc35fc1e5c8dae5415a29315b0a3f529eb3a716c",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-11-15T17:29:59.0184450Z",
+  "retryCount": 1,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 0,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "production-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "npm warn Unknown env config \u0022scripts-prepend-node-path\u0022. This will stop working in the next major version of npm. See \u0060npm help npmrc\u0060 for supported config options.\n\n\u003E archers-web@0.1.0 build\n\u003E tsc --noEmit \u0026\u0026 vite build\n\nvite v7.2.2 building client environment for production...\ntransforming...\n\u2713 32 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.46 kB \u2502 gzip:  0.29 kB\ndist/assets/index-DLyBzI1Z.css    2.82 kB \u2502 gzip:  1.14 kB\ndist/assets/index-B_9Ecv0f.js   210.79 kB \u2502 gzip: 65.87 kB\n\u2713 built in 328ms\n",
+        "durationMs": 1228
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "npm warn Unknown env config \u0022scripts-prepend-node-path\u0022. This will stop working in the next major version of npm. See \u0060npm help npmrc\u0060 for supported config options.\n\n\u003E archers-web@0.1.0 test\n\u003E vitest run\n\n\n\u001B[1m\u001B[46m RUN \u001B[49m\u001B[22m \u001B[36mv4.0.9 \u001B[39m\u001B[90m/Users/ditu/Documents/dev/Archers/web\u001B[39m\n\n \u001B[32m\u2713\u001B[39m src/api.test.ts \u001B[2m(\u001B[22m\u001B[2m21 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[32m 8\u001B[2mms\u001B[22m\u001B[39m\n \u001B[32m\u2713\u001B[39m src/App.test.tsx \u001B[2m(\u001B[22m\u001B[2m15 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 879\u001B[2mms\u001B[22m\u001B[39m\n\n\u001B[2m Test Files \u001B[22m \u001B[1m\u001B[32m2 passed\u001B[39m\u001B[22m\u001B[90m (2)\u001B[39m\n\u001B[2m      Tests \u001B[22m \u001B[1m\u001B[32m36 passed\u001B[39m\u001B[22m\u001B[90m (36)\u001B[39m\n\u001B[2m   Start at \u001B[22m 17:29:57\n\u001B[2m   Duration \u001B[22m 1.38s\u001B[2m (transform 84ms, setup 158ms, collect 107ms, tests 887ms, environment 541ms, prepare 4ms)\u001B[22m\n\n",
+        "durationMs": 1696,
+        "testResults": {
+          "testFramework": "vitest",
+          "runnerDetectedFrom": "package_json",
+          "testsTotal": 36,
+          "testsPassed": 36,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      },
+      {
+        "name": "preview-serves-home",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!doctype html\u003E\n\u003Chtml lang=\u0022en\u0022\u003E\n  \u003Chead\u003E\n    \u003Cmeta charset=\u0022UTF-8\u0022 /\u003E\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022 /\u003E\n    \u003Cmeta name=\u0022referrer\u0022 content=\u0022same-origin\u0022 /\u003E\n    \u003Ctitle\u003EArchers Administration\u003C/title\u003E\n    \u003Cscript type=\u0022module\u0022 crossorigin src=\u0022/assets/index-B_9Ecv0f.js\u0022\u003E\u003C/script\u003E\n    \u003Clink rel=\u0022stylesheet\u0022 crossorigin href=\u0022/assets/index-DLyBzI1Z.css\u0022\u003E\n  \u003C/head\u003E\n  \u003Cbody\u003E\n    \u003Cdiv id=\u0022root\u0022\u003E\u003C/div\u003E\n  \u003C/body\u003E\n\u003C/html\u003E\n\n--- server output ---\nnpm warn Unknown env config \u0022scripts-prepend-node-path\u0022. This will stop working in the next major version of npm. See \u0060npm help npmrc\u0060 for supported config options.\n\n\u003E archers-web@0.1.0 preview\n\u003E vite preview --host 127.0.0.1 --port 4178 --strictPort\n\n  \u279C  Local:   http://127.0.0.1:4178/\n",
+        "durationMs": 300
+      }
+    ],
+    "executions": [
+      {
+        "source": "production-build",
+        "resolvedExecutable": "/opt/homebrew/bin/npm",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "/Users/ditu/Documents/dev/Archers/web",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": "/opt/homebrew/bin/node",
+        "nodeVersion": "v26.11.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "/opt/homebrew/bin/npm",
+        "packageManagerVersion": "11.20.0",
+        "cleanup": {
+          "RootProcessId": 80544,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 0,
+          "Failure": null
+        }
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "/opt/homebrew/bin/npm",
+        "args": [
+          "test"
+        ],
+        "cwd": "/Users/ditu/Documents/dev/Archers/web",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": "/opt/homebrew/bin/node",
+        "nodeVersion": "v26.11.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "/opt/homebrew/bin/npm",
+        "packageManagerVersion": "11.20.0",
+        "cleanup": {
+          "RootProcessId": 80581,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 0,
+          "Failure": null
+        }
+      },
+      {
+        "source": "preview-serves-home",
+        "resolvedExecutable": "/opt/homebrew/bin/npm",
+        "args": [
+          "run",
+          "preview",
+          "--",
+          "--port",
+          "4178",
+          "--strictPort"
+        ],
+        "cwd": "/Users/ditu/Documents/dev/Archers/web",
+        "env": {},
+        "prependPath": [],
+        "platform": "darwin",
+        "nodeExecutable": "/opt/homebrew/bin/node",
+        "nodeVersion": "v26.11.0",
+        "packageManager": "npm",
+        "packageManagerExecutable": "/opt/homebrew/bin/npm",
+        "packageManagerVersion": "11.20.0",
+        "cleanup": {
+          "RootProcessId": 80616,
+          "Completed": true,
+          "ProcessesObserved": 1,
+          "ProcessesTerminated": 1,
+          "Failure": null
+        }
+      }
+    ]
+  }
+}

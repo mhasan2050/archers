@@ -1,0 +1,9 @@
+origins:
+  - http://localhost:8080
+secure_cookie: false
+network_mode: airgap
+artifact_root: /data
+max_upload_bytes: 26214400
+job_lease_seconds: 120
+approved_mounts:
+  synthetic: /synthetic
