@@ -1,13 +1,21 @@
-# Archers - Ask questions about your company documents
+# Archers - A self-hosted, secure RAG system for organisations
 
-Archers is a self-hosted application being built to help employees find answers
-in company documents, with citations back to the source. Instead of searching
-through many PDFs manually, users will be able to ask a question in plain language.
+Archers is being built as a **self-hosted, secure retrieval-augmented generation
+(RAG) system** for any organisation that wants to query vast amounts of
+document-based data. Its goal is to turn large collections of PDFs, office files
+and other supported formats into searchable knowledge, with natural-language
+answers and citations back to the source.
 
-It uses **retrieval-augmented generation (RAG)**: find relevant document passages
-first, then ask an AI model to answer using those passages. The goal is to run
-locally in Docker, using local open-source models by default. Paid models will
-be optional and require explicit approval; there is no automatic cloud fallback.
+Self-hosting keeps deployment and data under the organisation's control.
+Security is a design priority, with authenticated access, role-based permissions,
+private document storage and local open-source embeddings. Local answer generation
+is planned; optional paid models will require explicit approval, with no automatic
+cloud fallback or hosted tracing.
+
+RAG finds relevant passages first, then uses an AI model to answer from that
+evidence. Archers targets local Docker deployments and private Kubernetes
+environments on AWS or Azure. Capacity and performance must be validated against
+each organisation's data and infrastructure; no large-scale benchmark is claimed.
 
 > **Work in progress, not a production RAG release.** Login, administration and
 > automatic folder ingestion and vector indexing are implemented. The chat/query
@@ -15,13 +23,10 @@ be optional and require explicit approval; there is no automatic cloud fallback.
 
 ## How it will work
 
-```text
-Company documents -> Extract text -> Split into chunks -> Create embeddings
-                                                              |
-                                                       Store in Qdrant
-                                                              |
-User question -> Find relevant chunks -> Generate answer with source citations
-```
+![How Archers works: documents are automatically ingested, extracted, chunked and indexed locally; the planned query workflow finds relevant passages and generates answers with citations.](./docs/images/how-archers-works.png)
+
+**Prepare your knowledge:** documents flow automatically into a local vector index.
+**Ask questions (planned):** retrieve relevant passages and generate cited answers.
 
 An embedding is a list of numbers representing the meaning of a text passage.
 It helps find relevant passages even when a question uses different wording.
