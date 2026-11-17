@@ -126,3 +126,7 @@ replacement. A new field requires a migration/DTO/test update, not an applicatio
 rewrite. Significant deviations follow [decision 0002](./decisions/0002-configurable-production-product.md).
 Compose and Helm share the same modules/images; see [packaging](./deployment-packaging.md)
 for shared artifact storage, global concurrency/budgets, and release gates.
+The [existing EKS/AKS deployment package](../deploy/README.md) renders current
+admin/ingestion processes with operator-provided private stores and shared PVCs.
+Its opt-in CPU HPA does not deploy the planned generation/provider services or
+certify multi-node operation.

@@ -1,7 +1,9 @@
 # Production deployment and packaging contract
 
-Status: release specification, not executable packaging. One company per install;
-not shared multi-company SaaS. See [security](./security.md) and
+Status: target release specification with staged Compose and Helm/Terraform
+packaging. Existing-cluster application manifests and static checks exist;
+cloud installation, scaling and production certification remain unverified.
+One company per install; not shared multi-company SaaS. See [security](./security.md) and
 [model policy](./models-cost-performance.md).
 
 ## Release artifact
@@ -68,6 +70,45 @@ it is not HA. Shipping images is not evidence of backup/upgrade reliability.
 Local volume storage is adequate on one host.
 
 ## Kubernetes
+
+### Implemented existing-cluster package
+
+The [Helm chart](../deploy/helm/archers/Chart.yaml) and
+[AWS/Azure operator guide](../deploy/README.md) package the current API, web,
+worker and optional single watcher using existing application entry points.
+Terraform entry points target explicit existing EKS/AKS kubeconfig contexts;
+they provision no cluster, database, IAM, CSI storage, ingress controller or
+secret values. Each installation uses its own namespace and external private
+stores. Approved digest-pinned images and existing PVC/Secret references are
+mandatory; model preparation remains an explicit offline/staging action.
+
+All artifact-consuming pods must share the same tested POSIX filesystem.
+Scaling additionally requires RWX storage confirmation, explicit acknowledgement
+of the uncertified topology, finite worker/HPA maxima, positive resource requests
+and limits, and a conservative PostgreSQL connection budget based on replica
+maxima. CPU-based HPA is optional and needs Metrics Server; it is not queue-depth
+scaling, a new global semaphore, a throughput guarantee or a spending limit.
+No other independent worker release may bypass the reviewed installation limit.
+Preferred node anti-affinity and PDBs accompany scaled workloads; Recreate
+rollouts avoid transient surplus model/process replicas and may cause downtime.
+
+The chart requires deny-by-default NetworkPolicies and approved RFC1918 IPv4
+store CIDRs. Ingress is off by default; enabling it requires exact HTTPS
+origin/host matching, an existing TLS secret, controller selectors and confirmation
+of private-only access. Operators must test actual CNI enforcement, DNS and
+address translation. Current Qdrant client authentication is not implemented;
+private isolation is mandatory and does not satisfy deployments requiring
+authenticated vector connections.
+
+Run the separately rendered migration Job and verify success before application
+rollout; no automatic Helm migration hook runs alongside live code. Terraform
+requires an explicit schema acknowledgement, not a purported database check.
+Application pod probes measure transport liveness after schema startup, not
+full RAG readiness. Query generation still leaves product readiness at 503.
+Workers/watchers have no queue-freshness probe; authenticated job/source
+monitoring and operator acceptance remain necessary.
+
+### Full target release
 
 Helm values expose replicas/resources, CPU/GPU requests, PVCs/storage classes,
 ingress/TLS, secrets references, network policies, model cache, queue limits, and

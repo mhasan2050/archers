@@ -242,6 +242,17 @@ certification remain follow-up work.
 
 Open the editable `.drawio` files in draw.io / diagrams.net.
 
+## AWS / Azure Kubernetes deployment
+
+Use the [cloud deployment guide](./deploy/README.md) for a Helm chart and Terraform
+entry points targeting **existing EKS or AKS clusters**, with operator-provided
+databases, private storage and Secrets. Optional bounded autoscaling covers the
+API, web and ingestion workers; the watcher stays single-replica.
+
+Defaults are private, local-model-only and single-replica. This packages today's
+ingestion/admin functionality, not a completed chat product. Cloud runtime,
+multi-node storage and scaling still require deployment-specific validation.
+
 ## Technical reference
 
 <details>

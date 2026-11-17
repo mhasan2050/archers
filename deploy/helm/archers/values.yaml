@@ -1,0 +1,86 @@
+# Supply approved digest-pinned images built from this repository.
+images:
+  backend: ""
+  web: ""
+imagePullSecrets: []
+
+# Existing resources must be in the release namespace. No secrets or PVCs are created.
+existingSecret: ""
+storage:
+  artifactsClaim: ""
+  modelClaim: ""
+  # Must be true before replicas or HPA can be enabled.
+  sharedArtifactsConfirmed: false
+
+application:
+  origin: ""
+  qdrantUrl: ""
+  maxPendingIngestionJobs: 100
+  maxUploadBytes: 26214400
+  parserTimeoutSeconds: 90
+
+source:
+  enabled: false
+  # The source contains .archers-source-id; credentials remain with CSI/operators.
+  existingClaim: ""
+  # Independently maintained fresh inbox.json health records, not a cached sentinel.
+  healthClaim: ""
+
+api:
+  replicas: 1
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  autoscaling: {enabled: false, minReplicas: 1, maxReplicas: 2, targetCPUUtilizationPercentage: 70}
+web:
+  replicas: 1
+  resources:
+    requests: {cpu: 100m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+  autoscaling: {enabled: false, minReplicas: 1, maxReplicas: 2, targetCPUUtilizationPercentage: 70}
+worker:
+  replicas: 1
+  resources:
+    requests: {cpu: "1", memory: 2Gi}
+    limits: {cpu: "2", memory: 4Gi}
+  autoscaling: {enabled: false, minReplicas: 1, maxReplicas: 2, targetCPUUtilizationPercentage: 70}
+watcher:
+  resources:
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {cpu: "1", memory: 512Mi}
+
+# CPU HPA is an opt-in starting point, not a queue-latency or cost guarantee.
+scaling:
+  acknowledgeUncertified: false
+  workerReplicaLimit: 2
+  databaseConnectionBudget: 60
+
+migration:
+  # Enable only for an explicitly gated migration release. No automatic Helm hooks.
+  enabled: false
+  revision: "0003-automatic-ingestion"
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  tlsSecretName: ""
+  # Controller-specific internal/private load balancer settings are operator-owned.
+  privateAccessConfirmed: false
+  annotations: {}
+
+networkPolicy:
+  enabled: true
+  # Allow only the actual ingress controller's namespace + pod labels.
+  ingressNamespaceLabels: {}
+  ingressPodLabels: {}
+  dnsNamespaceLabels: {kubernetes.io/metadata.name: kube-system}
+  dnsPodLabels: {k8s-app: kube-dns}
+  # Use approved private /32 or /128 addresses, or tightly scoped private subnets.
+  databaseCidrs: []
+  databasePort: 5432
+  qdrantCidrs: []
+  qdrantPort: 6333
+
+nodeSelector: {}
+tolerations: []

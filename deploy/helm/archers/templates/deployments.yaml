@@ -1,0 +1,178 @@
+{{- range $component := list "api" "web" "worker" "watcher" }}
+{{- if or (ne $component "watcher") $.Values.source.enabled }}
+{{- $config := index $.Values $component }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "archers.name" $ }}-{{ $component }}
+  labels:
+    {{- include "archers.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  {{- if eq $component "watcher" }}
+  replicas: 1
+  {{- else if not $config.autoscaling.enabled }}
+  replicas: {{ $config.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name | quote }}
+      app.kubernetes.io/component: {{ $component }}
+  template:
+    metadata:
+      labels:
+        {{- include "archers.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $component }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ if eq $component "worker" }}330{{ else }}30{{ end }}
+      securityContext:
+        {{- if eq $component "web" }}
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: {type: RuntimeDefault}
+        {{- else }}
+        {{- include "archers.podSecurity" $ | nindent 8 }}
+        {{- end }}
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: {{ $.Release.Name | quote }}
+                    app.kubernetes.io/component: {{ $component }}
+      containers:
+        - name: {{ $component }}
+          image: {{ if eq $component "web" }}{{ $.Values.images.web | quote }}{{ else }}{{ $.Values.images.backend | quote }}{{ end }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            {{- include "archers.containerSecurity" $ | nindent 12 }}
+          resources:
+            {{- toYaml $config.resources | nindent 12 }}
+          {{- if ne $component "web" }}
+          command: ["archers", "{{ if eq $component "watcher" }}watch{{ else }}{{ $component }}{{ end }}"]
+          env:
+            {{- include "archers.environment" $ | nindent 12 }}
+          {{- end }}
+          {{- if or (eq $component "api") (eq $component "web") }}
+          ports:
+            - name: http
+              containerPort: {{ if eq $component "api" }}8000{{ else }}8080{{ end }}
+          startupProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ trimPrefix "https://" $.Values.application.origin | quote }}
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: {{ if eq $component "api" }}/api/v1/health/live{{ else }}/{{ end }}
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ trimPrefix "https://" $.Values.application.origin | quote }}
+            periodSeconds: 15
+          # Transport health only: product RAG readiness intentionally remains 503.
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ trimPrefix "https://" $.Values.application.origin | quote }}
+            periodSeconds: 10
+          {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if eq $component "web" }}
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            {{- else }}
+            - name: config
+              mountPath: /run/config
+              readOnly: true
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+            - name: artifacts
+              mountPath: /data
+            {{- if eq $component "worker" }}
+            - name: model
+              mountPath: /models/embedding
+              readOnly: true
+            {{- end }}
+            {{- if eq $component "watcher" }}
+            - name: source
+              mountPath: /sources/inbox
+              readOnly: true
+            - name: source-health
+              mountPath: /run/source-health
+              readOnly: true
+            {{- end }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: config
+          configMap:
+            name: {{ include "archers.name" $ }}-config
+        {{- if eq $component "web" }}
+        - name: nginx-cache
+          emptyDir:
+            sizeLimit: 128Mi
+        {{- else }}
+        - name: secrets
+          secret:
+            secretName: {{ $.Values.existingSecret | quote }}
+            defaultMode: 0440
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: {{ $.Values.storage.artifactsClaim | quote }}
+        {{- if eq $component "worker" }}
+        - name: model
+          persistentVolumeClaim:
+            claimName: {{ $.Values.storage.modelClaim | quote }}
+        {{- end }}
+        {{- if eq $component "watcher" }}
+        - name: source
+          persistentVolumeClaim:
+            claimName: {{ $.Values.source.existingClaim | quote }}
+        - name: source-health
+          persistentVolumeClaim:
+            claimName: {{ $.Values.source.healthClaim | quote }}
+        {{- end }}
+        {{- end }}
+{{- end }}
+{{- end }}

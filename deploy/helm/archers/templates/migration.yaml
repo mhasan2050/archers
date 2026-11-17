@@ -1,0 +1,103 @@
+{{- if .Values.migration.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "archers.migrationName" . }}-config
+  labels:
+    {{- include "archers.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+data:
+  settings.yaml: |
+{{ include "archers.settings" . | indent 4 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "archers.migrationName" . }}
+  labels:
+    {{- include "archers.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+spec:
+  podSelector:
+    matchLabels:
+      archers-migration: {{ include "archers.migrationName" . }}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.dnsNamespaceLabels | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.dnsPodLabels | nindent 14 }}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        {{- range .Values.networkPolicy.databaseCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.databasePort }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "archers.migrationName" . }}
+  labels:
+    {{- include "archers.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "archers.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+        archers-migration: {{ include "archers.migrationName" . }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "archers.podSecurity" . | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: {{ .Values.images.backend | quote }}
+          command: ["archers", "migrate"]
+          env:
+            {{- include "archers.environment" . | nindent 12 }}
+          securityContext:
+            {{- include "archers.containerSecurity" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            - {name: config, mountPath: /run/config, readOnly: true}
+            - {name: secrets, mountPath: /run/secrets, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "archers.migrationName" . }}-config
+        - name: secrets
+          secret:
+            secretName: {{ .Values.existingSecret | quote }}
+            defaultMode: 0440
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
+{{- end }}

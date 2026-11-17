@@ -1,0 +1,12 @@
+{{- include "archers.validate" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "archers.name" . }}-config
+  labels:
+    {{- include "archers.labels" . | nindent 4 }}
+data:
+  settings.yaml: |
+{{ include "archers.settings" . | indent 4 }}
+  nginx.conf: |
+{{ tpl (.Files.Get "files/nginx.conf") . | indent 4 }}

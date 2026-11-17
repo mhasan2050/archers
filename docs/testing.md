@@ -37,6 +37,28 @@ verification, not complete RAG/query or production certification.
 Docker daemon remains unavailable for image/build/runtime checks; Compose syntax
 can be checked without it.
 
+### Kubernetes and Terraform packaging
+
+- `backend/.venv/bin/python -m pytest deploy/tests/test_helm.py -q` uses installed
+  Helm and kubeconform (or `HELM_BIN` / `KUBECONFORM_BIN`) for private single-replica
+  defaults, application configuration compatibility, nginx perimeter parity,
+  read-only source/model mounts, bounded HPA, rejected unsafe values, migration
+  isolation and AWS/Azure example rendering against Kubernetes 1.33.0 schemas.
+- `terraform fmt -check -recursive deploy/terraform`
+- Run `terraform init -backend=false` then `terraform validate` in each of
+  [AWS](../deploy/terraform/aws/main.tf) and
+  [Azure](../deploy/terraform/azure/main.tf).
+- Run `terraform init -backend=false` then `terraform test` in the
+  [shared module](../deploy/terraform/modules/archers/main.tf). A mocked Helm
+  provider exercises deployment settings and migration acknowledgement/rejection;
+  it does not contact a cluster.
+
+See the [deployment guide](../deploy/README.md) for verified tool versions.
+No cloud apply, cluster install, actual NetworkPolicy enforcement, HPA load test,
+shared cloud filesystem, cloud restore or Linux sandbox has been verified by
+these static checks. Public schema/provider initialization may need internet or
+preapproved caches; tests use synthetic configuration only.
+
 ## Tooling and change workflow
 
 During bootstrap, establish pytest for backend/domain/integration checks, Ruff

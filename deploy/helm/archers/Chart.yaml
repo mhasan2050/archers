@@ -1,0 +1,6 @@
+apiVersion: v2
+name: archers
+description: Private Archers administration and document ingestion on existing Kubernetes infrastructure
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,10 +1,15 @@
 # High-Level Design: Configurable Self-hosted Knowledge Assistant
 
-Status: proposed design, not an implemented or benchmarked system.
+Status: target design with implemented administration/ingestion foundations.
+Query generation and production benchmarking remain incomplete.
 
 Implementation context: [contract index](./docs/README.md). This overview and its
 diagrams explain the design; the indexed topic contracts own implementation
 details and change rules.
+
+The [cloud deployment guide](./deploy/README.md) covers the current Helm chart
+and Terraform entry points for existing EKS/AKS clusters, including opt-in bounded
+scaling. This does not certify cloud runtime or implement the full target design.
 
 Companion document: [Low-Level Design](./LLD.md).
 

@@ -15,6 +15,11 @@ Implementation status (current workspace):
   NAS requires independent host-health evidence.
 - Query orchestration/answers, OCR/review resolution, automatic withdrawals,
   vector/orphan cleanup and paid-provider gateway workflows remain unfinished.
+- A portable Helm chart and Terraform entry points for existing EKS/AKS clusters
+  package the current implementation with external stores/PVCs, private ingress,
+  explicit migration gates and optional bounded HPA. See the
+  [cloud deployment guide](../deploy/README.md). Static checks are not cloud,
+  scaling, HA or Linux sandbox certification.
 
 ## Purpose and authority
 

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["images", "existingSecret", "storage", "application", "source", "api", "web", "worker", "watcher", "scaling", "migration", "ingress", "networkPolicy", "nodeSelector", "tolerations", "imagePullSecrets"],
+  "properties": {
+    "images": {
+      "type": "object", "additionalProperties": false, "required": ["backend", "web"],
+      "properties": {"backend": {"type": "string"}, "web": {"type": "string"}}
+    },
+    "existingSecret": {"type": "string"},
+    "imagePullSecrets": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name"], "properties": {"name": {"type": "string", "minLength": 1}}}},
+    "storage": {
+      "type": "object", "additionalProperties": false, "required": ["artifactsClaim", "modelClaim", "sharedArtifactsConfirmed"],
+      "properties": {"artifactsClaim": {"type": "string"}, "modelClaim": {"type": "string"}, "sharedArtifactsConfirmed": {"type": "boolean"}}
+    },
+    "application": {
+      "type": "object", "additionalProperties": false,
+      "required": ["origin", "qdrantUrl", "maxPendingIngestionJobs", "maxUploadBytes", "parserTimeoutSeconds"],
+      "properties": {
+        "origin": {"type": "string"},
+        "qdrantUrl": {"type": "string"},
+        "maxPendingIngestionJobs": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "maxUploadBytes": {"type": "integer", "minimum": 1, "maximum": 26214400},
+        "parserTimeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 300}
+      }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false, "required": ["enabled", "existingClaim", "healthClaim"],
+      "properties": {"enabled": {"type": "boolean"}, "existingClaim": {"type": "string"}, "healthClaim": {"type": "string"}}
+    },
+    "api": {"$ref": "#/definitions/workload"},
+    "web": {"$ref": "#/definitions/workload"},
+    "worker": {"$ref": "#/definitions/workload"},
+    "watcher": {
+      "type": "object", "additionalProperties": false, "required": ["resources"],
+      "properties": {"resources": {"$ref": "#/definitions/resources"}}
+    },
+    "scaling": {
+      "type": "object", "additionalProperties": false,
+      "required": ["acknowledgeUncertified", "workerReplicaLimit", "databaseConnectionBudget"],
+      "properties": {
+        "acknowledgeUncertified": {"type": "boolean"},
+        "workerReplicaLimit": {"type": "integer", "minimum": 1, "maximum": 32},
+        "databaseConnectionBudget": {"type": "integer", "minimum": 45, "maximum": 10000}
+      }
+    },
+    "migration": {
+      "type": "object", "additionalProperties": false, "required": ["enabled", "revision"],
+      "properties": {"enabled": {"type": "boolean"}, "revision": {"type": "string", "maxLength": 30, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"}}
+    },
+    "ingress": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "className", "host", "tlsSecretName", "privateAccessConfirmed", "annotations"],
+      "properties": {
+        "enabled": {"type": "boolean"}, "className": {"type": "string"}, "host": {"type": "string"},
+        "tlsSecretName": {"type": "string"}, "privateAccessConfirmed": {"type": "boolean"},
+        "annotations": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    },
+    "networkPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "ingressNamespaceLabels", "ingressPodLabels", "dnsNamespaceLabels", "dnsPodLabels", "databaseCidrs", "databasePort", "qdrantCidrs", "qdrantPort"],
+      "properties": {
+        "enabled": {"const": true},
+        "ingressNamespaceLabels": {"$ref": "#/definitions/labels"},
+        "ingressPodLabels": {"$ref": "#/definitions/labels"},
+        "dnsNamespaceLabels": {"$ref": "#/definitions/nonemptyLabels"},
+        "dnsPodLabels": {"$ref": "#/definitions/nonemptyLabels"},
+        "databaseCidrs": {"$ref": "#/definitions/privateCidrs"},
+        "qdrantCidrs": {"$ref": "#/definitions/privateCidrs"},
+        "databasePort": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "qdrantPort": {"type": "integer", "minimum": 1, "maximum": 65535}
+      }
+    },
+    "nodeSelector": {"$ref": "#/definitions/labels"},
+    "tolerations": {"type": "array", "items": {"type": "object"}}
+  },
+  "definitions": {
+    "labels": {"type": "object", "additionalProperties": {"type": "string"}},
+    "nonemptyLabels": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string"}},
+    "privateCidrs": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^(10\\.([0-9]{1,3}\\.){2}[0-9]{1,3}/(8|9|[12][0-9]|3[0-2])|172\\.(1[6-9]|2[0-9]|3[01])\\.[0-9]{1,3}\\.[0-9]{1,3}/(1[2-9]|2[0-9]|3[0-2])|192\\.168\\.[0-9]{1,3}\\.[0-9]{1,3}/(1[6-9]|2[0-9]|3[0-2]))$"}
+    },
+    "resources": {
+      "type": "object", "additionalProperties": false, "required": ["requests", "limits"],
+      "properties": {
+        "requests": {"$ref": "#/definitions/resourceQuantities"},
+        "limits": {"$ref": "#/definitions/resourceQuantities"}
+      }
+    },
+    "resourceQuantities": {
+      "type": "object", "additionalProperties": false, "required": ["cpu", "memory"],
+      "properties": {
+        "cpu": {"type": "string", "pattern": "^([1-9][0-9]*m|[1-9][0-9]*|0\\.[0-9]*[1-9][0-9]*)$"},
+        "memory": {"type": "string", "pattern": "^[1-9][0-9]*(Mi|Gi)$"}
+      }
+    },
+    "workload": {
+      "type": "object", "additionalProperties": false, "required": ["replicas", "resources", "autoscaling"],
+      "properties": {
+        "replicas": {"type": "integer", "minimum": 1, "maximum": 32},
+        "resources": {"$ref": "#/definitions/resources"},
+        "autoscaling": {
+          "type": "object", "additionalProperties": false,
+          "required": ["enabled", "minReplicas", "maxReplicas", "targetCPUUtilizationPercentage"],
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicas": {"type": "integer", "minimum": 1, "maximum": 32},
+            "maxReplicas": {"type": "integer", "minimum": 1, "maximum": 32},
+            "targetCPUUtilizationPercentage": {"type": "integer", "minimum": 1, "maximum": 100}
+          }
+        }
+      }
+    }
+  }
+}

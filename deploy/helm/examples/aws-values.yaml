@@ -1,0 +1,28 @@
+# Replace every example reference; no cloud resources are provisioned by this chart.
+images:
+  backend: ACCOUNT.dkr.ecr.REGION.amazonaws.com/archers-backend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  web: ACCOUNT.dkr.ecr.REGION.amazonaws.com/archers-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+existingSecret: archers-runtime
+storage:
+  artifactsClaim: archers-artifacts-efs
+  modelClaim: archers-model-efs
+application:
+  origin: https://archers.internal.example
+  qdrantUrl: http://qdrant.internal.example:6333
+source:
+  enabled: true
+  existingClaim: archers-source-efs
+  healthClaim: archers-source-health-efs
+networkPolicy:
+  databaseCidrs: [10.20.10.0/24]
+  qdrantCidrs: [10.20.11.20/32]
+  # Example for a pod-based ingress-nginx controller behind an internal AWS LB.
+  ingressNamespaceLabels: {kubernetes.io/metadata.name: ingress-nginx}
+  ingressPodLabels: {app.kubernetes.io/name: ingress-nginx, app.kubernetes.io/component: controller}
+ingress:
+  enabled: true
+  className: nginx
+  host: archers.internal.example
+  tlsSecretName: archers-tls
+  # Set true only after verifying the existing controller's LB is private.
+  privateAccessConfirmed: false

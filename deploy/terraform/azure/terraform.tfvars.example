@@ -1,0 +1,5 @@
+kube_context               = "archers-aks"
+namespace                  = "archers"
+values_file                = "/absolute/private/path/azure-values.yaml"
+# Acknowledgement only; Terraform does not execute or verify this migration.
+migration_revision_applied = "0003_automatic_ingestion"
